@@ -3,6 +3,7 @@
 ----------                          Have fun !                              ----------
 --------------------------------------------------------------------------------------
 
+saved = false
 
 ESX = nil
 --[[    ESX Base    ]]
@@ -60,8 +61,8 @@ function OpenVehicleMenu()
         title    = '車輛控制系統',
         align    = 'bottom-right',
         elements = {
+                {label = '保存', value = 'vehicle_save' },
                 {label = '引擎', value = 'vehicle_engine' },
-                {label = '定速', value = 'vehicle_speed' },
                 {label = '車輛', value = 'vehicle_lock' },
                 {label = '車門', value = 'vehicle_door' },
                 {label = '車窗', value = 'vehicle_window'},
@@ -69,7 +70,27 @@ function OpenVehicleMenu()
         }, 
         function(data, menu)
 
-        if data.current.value == 'vehicle_engine' then
+        if data.current.value == 'vehicle_save' then
+            local player = GetPlayerPed(-1)
+            if (IsPedSittingInAnyVehicle(player)) then 
+                if  saved == true then
+                    saveVehicle = nil
+                    RemoveBlip(targetBlip)
+                    Notify("已刪除保存的車輛")
+                    saved = false
+                else
+                    RemoveBlip(targetBlip)
+                    saveVehicle = GetVehiclePedIsIn(player,true)
+                    local vehicle = saveVehicle
+                    targetBlip = AddBlipForEntity(vehicle)
+                    SetBlipSprite(targetBlip,225)
+                    Notify("車輛 ~y~" .. GetLabelText(GetDisplayNameFromVehicleModel(GetEntityModel(vehicle))) .. "~w~ 以保存")
+                    saved = true
+                end
+            else
+                Notify('你必須~g~在車內~w~才可以執行此~r~動作')
+            end
+        elseif data.current.value == 'vehicle_engine' then
             ESX.UI.Menu.CloseAll()
             ESX.UI.Menu.Open(
                 'default', GetCurrentResourceName(), 'vehicle_engine_info',
@@ -88,34 +109,6 @@ function OpenVehicleMenu()
                     TriggerEvent('engine', true)
                 elseif data.current.value == 'engine_off' then
                     TriggerEvent('engine', false)
-                end
-                ESX.UI.Menu.CloseAll()
-            end)
-        elseif data.current.value == 'vehicle_speed' then
-            ESX.UI.Menu.CloseAll()
-            ESX.UI.Menu.Open(
-                'default', GetCurrentResourceName(), 'vehicle_speed_info',
-                {
-                title    = '車輛控制系統 - 定速',
-                align    = 'bottom-right',
-                elements = {
-                        {label = '關閉定速系統', value = 'close_cruise'},
-                        {label = '定速(60km/h)', value = 'speed_60'},
-                        {label = '定速(120km/h)', value = 'speed_120'},
-                        {label = '定速(150km/h)', value = 'speed_150'},
-                        {label = '關閉', value = 'close'},
-                    },
-                },
-                function(data, menu)
-                
-                if data.current.value == 'close_cruise' then
-                    TriggerEvent('speed_cruise', false)
-                elseif data.current.value == 'speed_60' then
-                    TriggerEvent('speed_cruise', speed6)
-                elseif data.current.value == 'speed_120' then
-                    TriggerEvent('speed_cruise', speed12)
-                elseif data.current.value == 'speed_150' then
-                    TriggerEvent('speed_cruise', speed15)
                 end
                 ESX.UI.Menu.CloseAll()
             end)
@@ -243,51 +236,27 @@ AddEventHandler('engine', function(data)
     end
 end)
 
---[[    Speed   ]]
-AddEventHandler('speed_cruise', function(num)
-    Citizen.CreateThread(function()
-        local player = GetPlayerPed(-1)
-        local vehicle = GetVehiclePedIsIn(player,false) 
-        while (IsPedSittingInAnyVehicle(player)) do 
-            Citizen.Wait(0)
-            if num == false then
-                local vehicleModel = GetEntityModel(vehicle)
-		        local float Max = GetVehicleMaxSpeed(vehicleModel)
-                SetEntityMaxSpeed(vehicle, Max)
-                Notify('定速系統~r~已禁用~w~,享受飆車的快感!')
-            elseif num == speed6 then
-                local six = 60/3.6
-                SetEntityMaxSpeed(vehicle, six)
-                Notify('定速系統~g~已啟用~w~,最高時速 ~r~60~w~ km/h')
-            elseif num == speed12 then
-                local twelve = 120/3.6
-                SetEntityMaxSpeed(vehicle, twelve)
-                Notify('定速系統~g~已啟用~w~,最高時速 ~r~120~w~ km/h')
-            elseif num == speed15 then
-                local fifteen = 150/3.6
-                SetEntityMaxSpeed(vehicle, fifteen)
-                Notify('定速系統~g~已啟用~w~,最高時速 ~r~150~w~ km/h')
-            end
-        end
-    end)
-end)
-
 --[[    lock    ]]
+RegisterNetEvent('vehicle_lock')
 AddEventHandler('vehicle_lock', function(data)
     local player = GetPlayerPed(-1)
-    local vehicle = GetVehiclePedIsIn(player, true) 
-    if data == true then
-        if (IsPedSittingInAnyVehicle(player)) then
-            SetVehicleDoorsLocked(vehicle, 4)
-        else
-            SetVehicleDoorsLocked(vehicle, 2)
+    local vehicle = GetVehiclePedIsIn(player, true)
+    if saved == true then
+        if data == true then
+            if (IsPedSittingInAnyVehicle(player)) then
+                SetVehicleDoorsLocked(vehicle, 4)
+            else
+                SetVehicleDoorsLocked(vehicle, 2)
+            end
+            PlayVehicleDoorCloseSound(vehicle, 1)
+            Notify('車輛~g~已上鎖')
+        elseif data == false then
+            SetVehicleDoorsLocked(vehicle, 1)
+            PlayVehicleDoorOpenSound(vehicle, 0)
+            Notify('車輛~r~已解鎖')
         end
-        PlayVehicleDoorCloseSound(vehicle, 1)
-        Notify('車輛~g~已上鎖')
-    elseif data == false then
-        SetVehicleDoorsLocked(vehicle, 1)
-        PlayVehicleDoorOpenSound(vehicle, 0)
-        Notify('車輛~r~已解鎖')
+    else
+        Notify('這不是你的車輛')
     end
 end)
 
